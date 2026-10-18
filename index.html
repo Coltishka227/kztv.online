@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KZTV.online — телеканалы Казахстана</title>
+  <meta name="description" content="Каталог казахстанских телеканалов с просмотром в браузере.">
+  <style>
+:root {
+  --bg: #14100d;
+  --surface: #1d1713;
+  --surface-2: #271f19;
+  --line: #3a2e25;
+  --text: #f2eae1;
+  --muted: #b3a294;
+  --accent: #e8863a;
+  --gold: #f2c14e;
+  --danger: #ff9a80;
+  --radius: 10px;
+  --font: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html { color-scheme: dark; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font-family: var(--font); font-size: 16px; line-height: 1.5;
+}
+button, input { font: inherit; color: inherit; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.muted { color: var(--muted); margin: 0; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+/* Шапка */
+.topbar {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; gap: 16px; justify-content: space-between;
+  padding: 12px clamp(16px, 4vw, 40px);
+  background: rgba(20, 16, 13, .94); border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(8px);
+}
+.brand { display: inline-flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none; font-weight: 700; font-size: 1.25rem; letter-spacing: .01em; }
+.brand-mark { width: 14px; height: 26px; border-radius: 3px; background: var(--accent); box-shadow: 8px 0 0 -2px var(--gold); margin-right: 6px; }
+.brand-dot { color: var(--accent); font-weight: 500; }
+.brand-leaf { width: 18px; height: 18px; fill: var(--accent); transform: rotate(18deg); margin-left: -2px; }
+.brand-leaf .vein { fill: none; stroke: var(--bg); stroke-width: 1.4; stroke-linecap: round; }
+.leaves { position: fixed; inset: 0; z-index: 5; pointer-events: none; overflow: hidden; }
+body.watching .leaves { display: none; }
+.leaf {
+  position: absolute; top: 0; opacity: .75; background-size: contain; background-repeat: no-repeat;
+  animation-name: leaf-fall, leaf-sway; animation-timing-function: linear, ease-in-out;
+  animation-iteration-count: infinite, infinite; animation-direction: normal, alternate;
+}
+@keyframes leaf-fall { from { transform: translateY(-8vh) rotate(0deg); } to { transform: translateY(108vh) rotate(360deg); } }
+@keyframes leaf-sway { from { translate: -18px 0; } to { translate: 18px 0; } }
+@media (prefers-reduced-motion: reduce) { .leaves { display: none; } }
+.search input {
+  width: min(320px, 46vw); padding: 9px 14px; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--line);
+}
+.search input::placeholder { color: var(--muted); }
+.search input:focus { border-color: var(--accent); outline: none; }
+
+.notice {
+  padding: 8px clamp(16px, 4vw, 40px); background: var(--surface-2);
+  border-bottom: 1px solid var(--line); color: var(--gold); font-size: .875rem;
+}
+
+main { padding: 24px clamp(16px, 4vw, 40px) 40px; max-width: 1280px; margin: 0 auto; }
+
+/* Плеер */
+.watch { margin-bottom: 32px; }
+.stage { position: relative; background: #000; border-radius: var(--radius); overflow: hidden; aspect-ratio: 16 / 9; border: 1px solid var(--line); }
+.stage iframe { width: 100%; height: 100%; display: block; border: 0; background: #000; }
+.stage video { width: 100%; height: 100%; display: block; background: #000; }
+.overlay {
+  position: absolute; inset: 0; display: flex; flex-direction: column; gap: 12px;
+  align-items: center; justify-content: center; text-align: center; padding: 24px;
+  background: rgba(14, 10, 7, .84);
+}
+.overlay p { margin: 0; max-width: 440px; }
+.overlay.is-error p { color: var(--danger); }
+.watch-info { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; margin-top: 14px; }
+.watch-info h2 { margin: 0; font-size: 1.35rem; }
+.watch-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.btn {
+  padding: 8px 16px; border-radius: 8px; cursor: pointer;
+  background: var(--surface-2); border: 1px solid var(--line);
+  transition: border-color .15s;
+}
+.btn:hover { border-color: var(--accent); }
+a.btn { display: inline-block; color: inherit; text-decoration: none; }
+[hidden] { display: none !important; }
+.btn-quiet { background: transparent; }
+
+/* Каталог */
+.catalog-head h1 { margin: 0 0 4px; font-size: clamp(1.5rem, 3vw, 2rem); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 20px; }
+.chip {
+  padding: 6px 14px; border-radius: 999px; cursor: pointer;
+  background: transparent; border: 1px solid var(--line); color: var(--muted);
+}
+.chip:hover { color: var(--text); border-color: var(--muted); }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #1f1006; font-weight: 600; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+.card {
+  display: flex; flex-direction: column; gap: 14px; text-align: left; cursor: pointer;
+  padding: 16px; border-radius: var(--radius);
+  background: var(--surface); border: 1px solid var(--line);
+  transition: border-color .15s;
+}
+.card:hover { border-color: var(--accent); }
+.card[aria-current="true"] { border-color: var(--gold); }
+.logo {
+  width: 100%; aspect-ratio: 16 / 9; border-radius: 8px; background: var(--surface-2);
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+  font-size: 1.8rem; font-weight: 700; color: var(--accent);
+}
+.logo img.fx-mono { filter: brightness(0) invert(1); }
+.logo img.fx-glow { filter: drop-shadow(0 0 3px rgba(255, 255, 255, .95)); }
+.logo img { max-width: 80%; max-height: 80%; object-fit: contain; }
+.card-name { font-weight: 600; }
+.card-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: .85rem; color: var(--muted); }
+.badge { padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+.badge.ok { color: var(--accent); border-color: var(--accent); }
+.badge.demo { color: var(--gold); border-color: var(--gold); }
+
+#empty { margin-top: 20px; }
+.footer { padding: 20px clamp(16px, 4vw, 40px) 32px; border-top: 1px solid var(--line); color: var(--muted); font-size: .85rem; }
+.footer p { max-width: 720px; margin: 0 auto 0 0; }
+
+@media (max-width: 560px) {
+  .topbar { flex-wrap: wrap; }
+  .search { flex: 1 1 100%; }
+  .search input { width: 100%; }
+  .grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .card { padding: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" id="home" href="#" aria-label="KZTV.online — на главную">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span>KZTV<span class="brand-dot">.online</span></span>
+      <svg class="brand-leaf" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C7 6 5 10 5 14c0 4 3 7 7 8 4-1 7-4 7-8 0-4-2-8-7-12z"/><path class="vein" d="M12 7v13"/></svg>
+    </a>
+    <label class="search">
+      <span class="sr-only">Поиск канала по названию</span>
+      <input id="search" type="search" placeholder="Найти канал" autocomplete="off">
+    </label>
+  </header>
+
+  <div class="notice" role="note">
+    Проект в разработке. Каналы добавляются постепенно.
+  </div>
+
+  <main>
+    <section id="watch" class="watch" aria-live="polite" hidden>
+      <div class="stage">
+        <video id="video" controls playsinline></video>
+        <iframe id="embed" title="Трансляция" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; screen-wake-lock" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" hidden></iframe>
+        <div id="overlay" class="overlay" hidden>
+          <p id="overlay-text"></p>
+          <button id="retry" class="btn" type="button" hidden>Повторить</button>
+        </div>
+      </div>
+      <div class="watch-info">
+        <div>
+          <h2 id="watch-title"></h2>
+          <p id="watch-meta" class="muted"></p>
+        </div>
+        <div class="watch-actions">
+          <button id="prev" class="btn" type="button">Предыдущий</button>
+          <button id="next" class="btn" type="button">Следующий</button>
+          <button id="close" class="btn btn-quiet" type="button">Закрыть</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="catalog">
+      <div class="catalog-head">
+        <h1>Телеканалы Казахстана</h1>
+        <p class="muted">Выберите канал, чтобы открыть плеер.</p>
+      </div>
+      <div id="chips" class="chips" role="group" aria-label="Категории"></div>
+      <div id="grid" class="grid"></div>
+      <p id="empty" class="muted" hidden>Ничего не найдено. Измените запрос или выберите другую категорию.</p>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>KZTV.online — независимый проект. Сайт не размещает видео и не утверждает, что найденные потоки разрешены к ретрансляции. Названия каналов и логотипы принадлежат их владельцам.</p>
+  </footer>
+
+  <!-- КАТАЛОГ КАНАЛОВ: чтобы добавить канал, скопируйте любую запись ниже и поправьте поля. Между записями нужна запятая. -->
+  <script id="channels-data" type="application/json">
+{
+  "version": 6,
+  "channels": [
+    {
+      "id": "qazaqstan",
+      "name": "Qazaqstan",
+      "category": "Общие",
+      "logo": "https://static.wikia.nocookie.net/tvpedia/images/a/a7/Qazaqstan_%282017%29.svg/revision/latest/scale-to-width-down/185?cb=20180504163348&path-prefix=ru",
+      "website": "https://qazaqstan.tv",
+      "streamUrl": "https://qazaqstantv-stream.qazcdn.com/qazaqstantv/qazaqstantv/playlist.m3u8",
+      "format": "hls",
+      "available": true,
+      "lastChecked": null,
+      "rightsStatus": "not_confirmed",
+      "status": "live"
+    },
+    {
+      "id": "khabar",
+      "name": "Хабар",
+      "category": "Новости",
+      "logo": "https://static.wikia.nocookie.net/tvpedia/images/4/41/%D0%A5%D0%B0%D0%B1%D0%B0%D1%80_%28%D1%81_2023%29.png/revision/latest?cb=20240720075950&path-prefix=ru",
+      "website": "https://khabar.kz/ru",
+      "streamUrl": "https://livekhabar-srt.cdnvideo.ru/khabarsrt/khabarsrt/playlist.m3u8",
+      "format": "hls",
+      "available": true,
+      "lastChecked": null,
+      "rightsStatus": "not_confirmed",
+      "status": "live"
+    },
+    {
+      "id": "24kz",
+      "name": "24KZ",
+      "category": "Новости",
+      "logo": "https://static.wikia.nocookie.net/tvpedia/images/6/6f/24KZ_%28%D1%81_2023%2C_%D1%8D%D1%84%D0%B8%D1%80%D0%BD%D1%8B%D0%B9%29.png/revision/latest/scale-to-width-down/185?cb=20240127213133&path-prefix=ru",
+      "website": "https://24.kz",
+      "streamUrl": "https://24kz-srt.cdnvideo.ru/24kzsrt/24kzsrt/playlist.m3u8",
+      "format": "hls",
+      "available": true,
+      "lastChecked": null,
+      "rightsStatus": "not_confirmed",
+      "status": "live",
+      "logoFx": "glow"
+    },
+    {
+      "id": "jibek-joly",
+      "name": "Jibek Joly",
+      "category": "Развлекательные",
+      "logo": "https://static.wikia.nocookie.net/tvpedia/images/7/7f/Jibek_Joly_%28%D1%81_2022%2C_%D1%8D%D1%84%D0%B8%D1%80%29.webp/revision/latest/scale-to-width-down/185?cb=20240610112602&path-prefix=ru",
+      "website": "https://jjtv.kz/ru",
+      "streamUrl": "https://stream.qazcdn.net/ex6r514/jjtv/tracks-v3a1/mono.ts.m3u8",
+      "format": "hls",
+      "available": true,
+      "lastChecked": null,
+      "rightsStatus": "not_confirmed",
+      "status": "live"
+    },
+    {
+      "id": "31-arna",
+      "name": "31 ARNA",
+      "category": "Развлекательные",
+      "logo": "https://static.wikia.nocookie.net/tvpedia/images/8/86/31_%D0%BA%D0%B0%D0%BD%D0%B0%D0%BB_%28%D0%9A%D0%B0%D0%B7%D0%B0%D1%85%D1%81%D1%82%D0%B0%D0%BD%29_%282026%29.svg/revision/latest/scale-to-width-down/268?cb=20260914142044&path-prefix=ru",
+      "website": null,
+      "streamUrl": "https://streams.adapto.kz/hls/live/31kz/main_stream.m3u8",
+      "format": "hls",
+      "available": true,
+      "lastChecked": null,
+      "rightsStatus": "not_confirmed",
+      "status": "live"
+    },
+    {
+      "id": "abai-tv",
+      "name": "Abai TV",
+      "category": "Общие",
+      "logo": "https://static.wikia.nocookie.net/tvpedia/images/7/7c/Abai_TV_%281%29.png/revision/latest/scale-to-width-down/220?cb=20220924055642&path-prefix=ru",
+      "website": null,
+      "streamUrl": "https://abaitv-stream.qazcdn.com/abaitv/abaitv/playlist.m3u8",
+      "format": "hls",
+      "available": true,
+      "lastChecked": null,
+      "rightsStatus": "not_confirmed",
+      "status": "live"
+    },
+    {
+      "id": "balapan",
+      "name": "Балапан",
+      "category": "Детские",
+      "logo": "https://static.wikia.nocookie.net/tvpedia/images/0/07/Balapan_%282022%292.png/revision/latest/scale-to-width-down/200?cb=20220824203453&path-prefix=ru",
+      "website": null,
+      "streamUrl": "https://balapantv-stream.qazcdn.com/balapantv/balapantv/playlist.m3u8",
+      "format": "hls",
+      "available": true,
+      "lastChecked": null,
+      "rightsStatus": "not_confirmed",
+      "status": "live"
+    },
+    {
+      "id": "muzzone",
+      "name": "MUZZONE",
+      "category": "Музыкальные",
+      "logo": null,
+      "website": null,
+      "streamUrl": null,
+      "embedUrl": "https://vk.ru/video_ext.php?oid=-15561055&id=456239473",
+      "format": "embed",
+      "available": true,
+      "lastChecked": null,
+      "rightsStatus": "offered_by_broadcaster",
+      "status": "live"
+    },
+    {
+      "id": "astana-tv",
+      "name": "Astana TV",
+      "category": "Общие",
+      "logo": "https://static.wikia.nocookie.net/tvpedia/images/3/3e/Astana_TV_%282019%29.png/revision/latest/scale-to-width-down/220?cb=20210516205114&path-prefix=ru",
+      "website": "https://astanatv.kz/ru",
+      "streamUrl": null,
+      "format": null,
+      "available": false,
+      "lastChecked": null,
+      "rightsStatus": "pending",
+      "status": "soon"
+    },
+    {
+      "id": "atameken-business",
+      "name": "Atameken Business",
+      "category": "Деловые",
+      "logo": "https://static.wikia.nocookie.net/televizionnofutbolnaya-viki/images/9/9a/Atameken_Business.png/revision/latest?cb=20240310114145&path-prefix=ru",
+      "website": "https://atamekenbusiness.kz",
+      "streamUrl": null,
+      "format": null,
+      "available": false,
+      "lastChecked": null,
+      "rightsStatus": "pending",
+      "status": "soon",
+      "logoFx": "mono"
+    },
+    {
+      "id": "saryarqa",
+      "name": "Saryarqa",
+      "category": "Региональные",
+      "logo": "https://static.wikia.nocookie.net/tvpedia/images/f/f1/Saryarqa_%28%D1%81_2017%29.png/revision/latest/scale-to-width-down/185?cb=20240304084214&path-prefix=ru",
+      "website": null,
+      "streamUrl": "https://stream.kaztrk.kz/regional/karagandytv/index.m3u8",
+      "format": "hls",
+      "available": true,
+      "lastChecked": null,
+      "rightsStatus": "not_confirmed",
+      "status": "live"
+    },
+    {
+      "id": "altai",
+      "name": "Altai",
+      "category": "Региональные",
+      "logo": "https://static.wikia.nocookie.net/tvpedia/images/c/c7/Altai.png/revision/latest/scale-to-width-down/185?cb=20210407202122&path-prefix=ru",
+      "website": null,
+      "streamUrl": null,
+      "format": null,
+      "available": false,
+      "lastChecked": null,
+      "rightsStatus": "pending",
+      "status": "soon"
+    },
+    {
+      "id": "aqjaiyq",
+      "name": "Aqjaiyq",
+      "category": "Региональные",
+      "logo": "https://static.wikia.nocookie.net/tvpedia/images/c/c6/Aqjaiyq_bez_fona.png/revision/latest/scale-to-width-down/185?cb=20200226063713&path-prefix=ru",
+      "website": null,
+      "streamUrl": "https://stream.kaztrk.kz/regional//oraltv/tracks-v1a1/mono.ts.m3u8",
+      "format": "hls",
+      "available": true,
+      "lastChecked": null,
+      "rightsStatus": "not_confirmed",
+      "status": "live"
+    },
+    {
+      "id": "aqtobe",
+      "name": "Aqtobe",
+      "category": "Региональные",
+      "logo": "https://static.wikia.nocookie.net/tvpedia/images/8/80/Aqtobe.png/revision/latest/scale-to-width-down/185?cb=20190728085435&path-prefix=ru",
+      "website": null,
+      "streamUrl": "https://stream.kaztrk.kz/regional/aktobetv/index.m3u8",
+      "format": "hls",
+      "available": true,
+      "lastChecked": null,
+      "rightsStatus": "not_confirmed",
+      "status": "live"
+    },
+    {
+      "id": "atyray",
+      "name": "Atyray",
+      "category": "Региональные",
+      "logo": "https://static.wikia.nocookie.net/tvpedia/images/4/42/Atyray_ispolzuetsya_v_efire.png/revision/latest/scale-to-width-down/185?cb=20180620165754&path-prefix=ru",
+      "website": null,
+      "streamUrl": "https://stream.kaztrk.kz/regional/atyrautv/index.m3u8",
+      "format": "hls",
+      "available": true,
+      "lastChecked": null,
+      "rightsStatus": "not_confirmed",
+      "status": "live"
+    },
+    {
+      "id": "ertis",
+      "name": "Ertis",
+      "category": "Региональные",
+      "logo": "https://static.wikia.nocookie.net/tvpedia/images/8/8d/Ertis_%282017%29.png/revision/latest/scale-to-width-down/185?cb=20210427132305&path-prefix=ru",
+      "website": null,
+      "streamUrl": "https://stream.kaztrk.kz/regional/pavlodartv/index.m3u8",
+      "format": "hls",
+      "available": true,
+      "lastChecked": null,
+      "rightsStatus": "not_confirmed",
+      "status": "live"
+    },
+    {
+      "id": "jambyl",
+      "name": "Jambyl",
+      "category": "Региональные",
+      "logo": "https://static.wikia.nocookie.net/tvpedia/images/b/bf/Jambyl.png/revision/latest/scale-to-width-down/185?cb=20200329083124&path-prefix=ru",
+      "website": null,
+      "streamUrl": "https://stream.kaztrk.kz/regional/taraztv/index.m3u8",
+      "format": "hls",
+      "available": true,
+      "lastChecked": null,
+      "rightsStatus": "not_confirmed",
+      "status": "live"
+    },
+    {
+      "id": "kokshe",
+      "name": "Kokshe",
+      "category": "Региональные",
+      "logo": "https://static.wikia.nocookie.net/tvpedia/images/d/d8/Kokshe_%282018-%D0%BD.%D0%B2._%D0%B1%D0%B5%D0%B7_%D1%84%D0%BE%D0%BD%D0%B0%29.png/revision/latest/scale-to-width-down/185?cb=20200225172414&path-prefix=ru",
+      "website": null,
+      "streamUrl": "https://stream.kaztrk.kz/regional/kokshetautv/index.m3u8",
+      "format": "hls",
+      "available": true,
+      "lastChecked": null,
+      "rightsStatus": "not_confirmed",
+      "status": "live"
+    },
+    {
+      "id": "qostanai",
+      "name": "Qostanai",
+      "category": "Региональные",
+      "logo": "https://static.wikia.nocookie.net/tvpedia/images/b/b9/%D0%9B%D0%BE%D0%B3%D0%BE%D1%82%D0%B8%D0%BF_Qostanai_%D1%81_2018_%D0%B3%D0%BE%D0%B4%D0%B0_%D0%B2_%D1%8D%D1%84%D0%B8%D1%80%D0%B5.png/revision/latest/scale-to-width-down/185?cb=20221230135312&path-prefix=ru",
+      "website": null,
+      "streamUrl": "https://stream.kaztrk.kz/regional/kostanaytv/index.m3u8",
+      "format": "hls",
+      "available": true,
+      "lastChecked": null,
+      "rightsStatus": "not_confirmed",
+      "status": "live"
+    },
+    {
+      "id": "qyzyljar",
+      "name": "Qyzyljar",
+      "category": "Региональные",
+      "logo": "https://static.wikia.nocookie.net/tvpedia/images/0/0d/Qyzyljar_%282017-%D0%BD.%D0%B2._%D0%B1%D0%B5%D0%B7_%D1%84%D0%BE%D0%BD%D0%B0%29.png/revision/latest/scale-to-width-down/185?cb=20200225162151&path-prefix=ru",
+      "website": null,
+      "streamUrl": "https://stream.kaztrk.kz/regional/petropavltv/index.m3u8",
+      "format": "hls",
+      "available": true,
+      "lastChecked": null,
+      "rightsStatus": "not_confirmed",
+      "status": "live"
+    },
+    {
+      "id": "qyzylorda",
+      "name": "Qyzylorda",
+      "category": "Региональные",
+      "logo": "https://static.wikia.nocookie.net/tvpedia/images/6/6d/Qyzylordatv.svg/revision/latest/scale-to-width-down/220?cb=20250117170614&path-prefix=ru",
+      "website": null,
+      "streamUrl": "https://stream.kaztrk.kz/regional/kyzylordatv/index.m3u8",
+      "format": "hls",
+      "available": true,
+      "lastChecked": null,
+      "rightsStatus": "not_confirmed",
+      "status": "live"
+    },
+    {
+      "id": "semei",
+      "name": "Semei",
+      "category": "Региональные",
+      "logo": "https://static.wikia.nocookie.net/tvpedia/images/2/22/Semey.png/revision/latest/scale-to-width-down/185?cb=20180621135901&path-prefix=ru",
+      "website": null,
+      "streamUrl": null,
+      "format": null,
+      "available": false,
+      "lastChecked": null,
+      "rightsStatus": "pending",
+      "status": "soon"
+    },
+    {
+      "id": "mangystay",
+      "name": "Mangystay",
+      "category": "Региональные",
+      "logo": "https://static.wikia.nocookie.net/tvpedia/images/3/35/MA%C5%83%C7%B4YSTA%C3%9D.png/revision/latest/scale-to-width-down/185?cb=20190728092408&path-prefix=ru",
+      "website": null,
+      "streamUrl": null,
+      "format": null,
+      "available": false,
+      "lastChecked": null,
+      "rightsStatus": "pending",
+      "status": "soon"
+    },
+    {
+      "id": "ontustik",
+      "name": "Ontustik",
+      "category": "Региональные",
+      "logo": "https://static.wikia.nocookie.net/tvpedia/images/5/5b/Ontustik.png/revision/latest/scale-to-width-down/185?cb=20210418130256&path-prefix=ru",
+      "website": null,
+      "streamUrl": "https://stream.kaztrk.kz/regional/shymkenttv/index.m3u8",
+      "format": "hls",
+      "available": true,
+      "lastChecked": null,
+      "rightsStatus": "not_confirmed",
+      "status": "live"
+    },
+    {
+      "id": "5-kanal-karaganda",
+      "name": "5 канал Караганда",
+      "category": "Региональные",
+      "logo": null,
+      "website": null,
+      "streamUrl": null,
+      "format": null,
+      "available": false,
+      "lastChecked": null,
+      "rightsStatus": "pending",
+      "status": "negotiation"
+    }
+  ]
+}
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
+  <script>
+// Обёртка над hls.js. Подключается до app.js, даёт глобальный объект KZPlayer.
+const KZPlayer = (() => {
+  let video = null;
+  let hls = null;
+  let notify = () => {};
+  let lastUrl = null;
+  let mediaRecoveries = 0;
+
+  function init(videoEl, onState) {
+    video = videoEl;
+    notify = onState || notify;
+    video.addEventListener('playing', () => notify('playing'));
+    video.addEventListener('waiting', () => notify('loading', 'Буферизация…'));
+  }
+
+  function stop() {
+    if (hls) { hls.destroy(); hls = null; }
+    if (video) {
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+    }
+  }
+
+  function tryPlay() {
+    video.play().catch(() => notify('paused', 'Нажмите «Воспроизвести», чтобы начать просмотр.'));
+  }
+
+  function load(url) {
+    stop();
+    lastUrl = url;
+    mediaRecoveries = 0;
+    if (!url) { notify('error', 'Для этого канала нет подтверждённого источника трансляции.'); return; }
+    notify('loading', 'Загрузка потока…');
+
+    if (window.Hls && Hls.isSupported()) {
+      hls = new Hls();
+      hls.on(Hls.Events.MANIFEST_PARSED, tryPlay);
+      hls.on(Hls.Events.ERROR, (_evt, data) => {
+        if (!data.fatal) return;
+        if (data.type === Hls.ErrorTypes.MEDIA_ERROR && mediaRecoveries < 2) {
+          mediaRecoveries += 1;
+          hls.recoverMediaError();
+          return;
+        }
+        const text = data.type === Hls.ErrorTypes.NETWORK_ERROR
+          ? 'Не удалось загрузить поток. Источник недоступен или блокирует доступ с этого сайта.'
+          : 'Поток не удалось воспроизвести. Формат не поддерживается или источник повреждён.';
+        stop();
+        notify('error', text);
+      });
+      hls.loadSource(url);
+      hls.attachMedia(video);
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      // Safari и iOS воспроизводят HLS сами
+      video.onerror = () => notify('error', 'Не удалось воспроизвести поток.');
+      video.src = url;
+      tryPlay();
+    } else {
+      notify('error', 'Этот браузер не поддерживает воспроизведение HLS.');
+    }
+  }
+
+  function retry() { load(lastUrl); }
+
+  return { init, load, stop, retry };
+})();
+
+// Логика интерфейса: каталог, поиск, категории, переключение каналов.
+(() => {
+  const $ = (sel) => document.querySelector(sel);
+  const el = {
+    grid: $('#grid'), chips: $('#chips'), empty: $('#empty'), search: $('#search'),
+    watch: $('#watch'), video: $('#video'), embed: $('#embed'), overlay: $('#overlay'),
+    overlayText: $('#overlay-text'), retry: $('#retry'),
+    title: $('#watch-title'), meta: $('#watch-meta'),
+    prev: $('#prev'), next: $('#next'), close: $('#close'),
+  };
+  const ALL = 'Все';
+  const state = { channels: [], category: ALL, query: '', currentId: null };
+
+  function filtered() {
+    const q = state.query.trim().toLowerCase();
+    return state.channels.filter((ch) =>
+      (state.category === ALL || ch.category === state.category) &&
+      (!q || ch.name.toLowerCase().includes(q)));
+  }
+
+  function hasStream(ch) { return (Boolean(ch.streamUrl) && ch.available !== false) || isEmbed(ch); }
+  function isEmbed(ch) { return typeof ch.embedUrl === 'string' && ch.embedUrl.startsWith('https://') && ch.available !== false; }
+
+  function badgeFor(ch) {
+    if (hasStream(ch)) return { text: 'Доступен', cls: 'ok' };
+    if (ch.status === 'negotiation') return { text: 'Согласование', cls: 'demo' };
+    return null;
+  }
+
+  function initials(name) {
+    return name.split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+  }
+
+  function renderChips() {
+    const cats = [ALL, ...new Set(state.channels.map((c) => c.category))];
+    el.chips.replaceChildren(...cats.map((cat) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'chip';
+      b.textContent = cat;
+      b.setAttribute('aria-pressed', String(cat === state.category));
+      b.addEventListener('click', () => { state.category = cat; renderChips(); renderGrid(); });
+      return b;
+    }));
+  }
+
+  function renderGrid() {
+    const list = filtered();
+    el.empty.hidden = list.length > 0;
+    el.grid.replaceChildren(...list.map((ch) => {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'card';
+      if (ch.id === state.currentId) card.setAttribute('aria-current', 'true');
+
+      const logo = document.createElement('div');
+      logo.className = 'logo';
+      if (ch.logo) {
+        const img = document.createElement('img');
+        img.src = ch.logo; img.alt = '';
+        logo.classList.add('has-img');
+        if (ch.logoFx) img.classList.add('fx-' + ch.logoFx);
+        img.onerror = () => { logo.classList.remove('has-img'); logo.textContent = initials(ch.name); };
+        logo.append(img);
+      } else {
+        logo.textContent = initials(ch.name);
+      }
+
+      const name = document.createElement('div');
+      name.className = 'card-name';
+      name.textContent = ch.name;
+
+      const row = document.createElement('div');
+      row.className = 'card-row';
+      const cat = document.createElement('span');
+      cat.textContent = ch.category;
+      row.append(cat);
+      const badge = badgeFor(ch);
+      if (badge) {
+        const tag = document.createElement('span');
+        tag.className = 'badge ' + badge.cls;
+        tag.textContent = badge.text;
+        row.append(tag);
+      }
+
+      card.append(logo, name, row);
+      card.addEventListener('click', () => openChannel(ch.id));
+      return card;
+    }));
+  }
+
+  function showOverlay(kind, text) {
+    if (kind === 'playing') { el.overlay.hidden = true; return; }
+    el.overlay.hidden = false;
+    el.overlay.classList.toggle('is-error', kind === 'error');
+    el.overlayText.textContent = text || '';
+    el.retry.hidden = !(kind === 'error' && state.channels.find((c) => c.id === state.currentId && hasStream(c)));
+  }
+
+  function openChannel(id) {
+    const ch = state.channels.find((c) => c.id === id);
+    if (!ch) return;
+    state.currentId = id;
+    el.watch.hidden = false;
+    document.body.classList.add('watching');
+    el.title.textContent = ch.name;
+    el.meta.textContent = ch.note ? `${ch.category} · ${ch.note}` : ch.category;
+    history.replaceState(null, '', '#' + id);
+    if (isEmbed(ch)) {
+      KZPlayer.stop();
+      el.video.hidden = true;
+      el.overlay.hidden = true;
+      el.embed.src = ch.embedUrl;
+      el.embed.hidden = false;
+    } else {
+      el.embed.hidden = true;
+      el.embed.src = 'about:blank';
+      el.video.hidden = false;
+      if (hasStream(ch)) {
+        KZPlayer.load(ch.streamUrl);
+      } else {
+        KZPlayer.stop();
+        showOverlay('info', ch.status === 'negotiation'
+          ? 'Трансляция согласовывается с вещателем.'
+          : 'Трансляция этого канала пока недоступна.');
+      }
+    }
+    el.watch.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    renderGrid();
+  }
+
+  function step(delta) {
+    const list = filtered();
+    if (!list.length) return;
+    const i = list.findIndex((c) => c.id === state.currentId);
+    const next = list[(i + delta + list.length) % list.length];
+    openChannel(next.id);
+  }
+
+  function closePlayer() {
+    KZPlayer.stop();
+    state.currentId = null;
+    el.watch.hidden = true;
+    el.embed.src = 'about:blank';
+    el.embed.hidden = true;
+    el.video.hidden = false;
+    document.body.classList.remove('watching');
+    history.replaceState(null, '', location.pathname);
+    renderGrid();
+  }
+
+  function initLeaves() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const colors = ['#e8863a', '#c8553d', '#f2c14e', '#a8572a'];
+    const box = document.createElement('div');
+    box.className = 'leaves';
+    box.setAttribute('aria-hidden', 'true');
+    const count = window.innerWidth < 600 ? 8 : 14;
+    for (let i = 0; i < count; i++) {
+      const size = 10 + Math.random() * 10;
+      const svg = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='" + colors[i % colors.length] +
+        "' d='M12 2C7 6 5 10 5 14c0 4 3 7 7 8 4-1 7-4 7-8 0-4-2-8-7-12z'/></svg>";
+      const leaf = document.createElement('span');
+      leaf.className = 'leaf';
+      leaf.style.left = (Math.random() * 100) + '%';
+      leaf.style.width = leaf.style.height = size + 'px';
+      leaf.style.animationDuration = (14 + Math.random() * 14) + 's, ' + (3 + Math.random() * 3) + 's';
+      leaf.style.animationDelay = '-' + (Math.random() * 20) + 's, -' + (Math.random() * 5) + 's';
+      leaf.style.backgroundImage = 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")';
+      box.append(leaf);
+    }
+    document.body.append(box);
+  }
+
+  async function start() {
+    initLeaves();
+    KZPlayer.init(el.video, showOverlay);
+    el.search.addEventListener('input', () => { state.query = el.search.value; renderGrid(); });
+    el.prev.addEventListener('click', () => step(-1));
+    el.next.addEventListener('click', () => step(1));
+    el.close.addEventListener('click', closePlayer);
+    el.retry.addEventListener('click', () => KZPlayer.retry());
+    $('#home').addEventListener('click', (e) => {
+      e.preventDefault();
+      closePlayer();
+      state.category = ALL; state.query = ''; el.search.value = '';
+      renderChips(); renderGrid();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    try {
+      state.channels = JSON.parse($('#channels-data').textContent).channels || [];
+    } catch (err) {
+      el.empty.hidden = false;
+      el.empty.textContent = 'Не удалось прочитать список каналов. Проверьте JSON в блоке channels-data.';
+      return;
+    }
+    renderChips();
+    renderGrid();
+    const fromHash = location.hash.slice(1);
+    if (fromHash) openChannel(fromHash);
+  }
+
+  start();
+})();
+  </script>
+</body>
+</html>
